@@ -1,0 +1,12 @@
+# Virtuelno okruženje
+venv/
+
+# Python baferovani fajlovi
+__pycache__/
+*.pyc
+
+# Vektorska baza (sami podaci)
+chroma_db/
+
+# VS Code podešavanja
+.vscode/

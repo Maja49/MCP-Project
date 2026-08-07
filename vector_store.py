@@ -1,9 +1,15 @@
 import os
 import chromadb
 from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "chroma_db")
+
+# Višejezični model koji fantastično razume i srpski i engleski
+multilingual_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="paraphrase-multilingual-MiniLM-L12-v2"
+)
 
 
 class VectorStoreManager:
@@ -15,7 +21,11 @@ class VectorStoreManager:
                 allow_reset=False
             )
         )
-        self.collection = self.client.get_or_create_collection(name=collection_name)
+        # Inicijalizacija kolekcije sa višejezičnim embedding modelom
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=multilingual_ef
+        )
 
     def add_records(self, records):
         """Dodaje listu radova u kolekciju"""
@@ -24,11 +34,9 @@ class VectorStoreManager:
         ids = []
 
         for idx, rec in enumerate(records):
-            # Dokument za embedding (naslov + sažetak)
             doc_text = f"Naslov: {rec.get('title', '')}. Sažetak: {rec.get('abstract', '')}"
             documents.append(doc_text)
             
-            # Metapodaci
             authors_str = ", ".join(rec.get("authors", [])) if isinstance(rec.get("authors"), list) else str(rec.get("authors", ""))
             metadatas.append({
                 "title": rec.get("title", "Nepoznat naslov"),
@@ -36,7 +44,6 @@ class VectorStoreManager:
                 "authors": authors_str
             })
             
-            # ID zapisa
             ids.append(f"rec_{idx}_{rec.get('id', 'no_id')}")
 
         if documents:

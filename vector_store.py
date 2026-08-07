@@ -1,76 +1,70 @@
+import os
 import chromadb
-from chromadb.utils import embedding_functions
-from typing import List, Dict, Any
+from chromadb.config import Settings
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "chroma_db")
+
 
 class VectorStoreManager:
-    """
-    Klasa zadužena za upravljanje ChromaDB vektorskom bazom,
-    indeksiranje radova i semantičku pretragu za RAG.
-    """
-    def __init__(self, db_path: str = "./chroma_db"):
-        # Inicijalizacija lokalne baze na disku
-        self.client = chromadb.PersistentClient(path=db_path)
-        
-        # Podrazumevani model za pretvaranje teksta u vektore
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-        
-        # Kreiranje ili preuzimanje kolekcije naučnih radova
-        self.collection = self.client.get_or_create_collection(
-            name="teslaris_publications",
-            embedding_function=self.embedding_fn
+    def __init__(self, db_path=DB_PATH, collection_name="teslaris_publications"):
+        self.client = chromadb.PersistentClient(
+            path=db_path,
+            settings=Settings(
+                anonymized_telemetry=False,
+                allow_reset=False
+            )
         )
+        self.collection = self.client.get_or_create_collection(name=collection_name)
 
-    def add_records(self, records: List[Dict[str, Any]]):
-        """
-        Gura preuzete radove iz konektora u vektorsku bazu.
-        """
+    def add_records(self, records):
+        """Dodaje listu radova u kolekciju"""
         documents = []
         metadatas = []
         ids = []
 
-        for record in records:
-            # Sastavljamo tekst za vektorsku pretragu (naslov + apstrakt)
-            text_content = f"Title: {record['title']}. Abstract: {record.get('abstract', '')}"
+        for idx, rec in enumerate(records):
+            # Dokument za embedding (naslov + sažetak)
+            doc_text = f"Naslov: {rec.get('title', '')}. Sažetak: {rec.get('abstract', '')}"
+            documents.append(doc_text)
             
-            documents.append(text_content)
+            # Metapodaci
+            authors_str = ", ".join(rec.get("authors", [])) if isinstance(rec.get("authors"), list) else str(rec.get("authors", ""))
             metadatas.append({
-                "title": record["title"],
-                "source": record["source"],
-                "authors": ", ".join(record.get("authors", []))
+                "title": rec.get("title", "Nepoznat naslov"),
+                "source": rec.get("source", "Nepoznat izvor"),
+                "authors": authors_str
             })
-            ids.append(str(record["id"]))
+            
+            # ID zapisa
+            ids.append(f"rec_{idx}_{rec.get('id', 'no_id')}")
 
-        if ids:
-            self.collection.upsert(
+        if documents:
+            self.collection.add(
                 documents=documents,
                 metadatas=metadatas,
                 ids=ids
             )
-            print(f"--> [VectorStore] Uspešno indeksirano {len(ids)} radova u bazu!")
+            print(f"--> Uspešno dodato {len(documents)} radova u kolekciju '{self.collection.name}'.")
 
-    def search(self, query: str, n_results: int = 3) -> List[Dict[str, Any]]:
-        """
-        Semantička (RAG) pretraga radova na osnovu upita.
-        """
+    def search(self, query: str, n_results: int = 5):
         print(f"--> [VectorStore] Pretražujem bazu za upit: '{query}'")
+        
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results
         )
 
         formatted_results = []
-        if results and results['metadatas']:
-            for i in range(len(results['metadatas'][0])):
-                meta = results['metadatas'][0][i]
-                doc = results['documents'][0][i]
-                dist = results['distances'][0][i] if 'distances' in results else None
-                
+        if results and results.get("documents") and results["documents"][0]:
+            documents = results["documents"][0]
+            metadatas = results["metadatas"][0] if results.get("metadatas") else [{}] * len(documents)
+
+            for doc, meta in zip(documents, metadatas):
                 formatted_results.append({
-                    "title": meta['title'],
-                    "authors": meta['authors'],
-                    "source": meta['source'],
-                    "content": doc,
-                    "distance": dist
+                    "title": meta.get("title", doc[:60]),
+                    "source": meta.get("source", "Nepoznat izvor"),
+                    "authors": meta.get("authors", "Nepoznati autori")
                 })
 
         return formatted_results

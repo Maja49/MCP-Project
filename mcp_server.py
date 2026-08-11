@@ -1,59 +1,50 @@
+import os
 import sys
-from fastmcp import FastMCP
+
+# 1. Postavljanje radnog direktorijuma na koren projekta (spasava od FileNotFoundError)
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, PROJECT_ROOT)
+
+from mcp.server.fastmcp import FastMCP
 from vector_store import VectorStoreManager
 
-# 1. Inicijalizacija MCP Servera
-mcp = FastMCP("TeslaRIS-RAG-Server")
+# Inicijalizacija FastMCP servera
+mcp = FastMCP("TeslaRIS MCP Server")
 
-# 2. Inicijalizacija vektorske baze
-vector_store = VectorStoreManager()
-
+# Eksplicitna apsolutna putanja do ChromaDB
+db_path = os.path.join(PROJECT_ROOT, "chroma_db")
+vsm = VectorStoreManager(db_path=db_path)
 
 @mcp.tool()
-def search_tesla_ris_publications(query: str, n_results: int = 5) -> str:
+def search_tesla_ris_publications(query: str, top_k: int = 5, entity_type: str = "all") -> str:
     """
-    Pretražuje naučne publikacije i istraživačke radove sa TeslaRIS platforme 
-    (Univerzitet u Novom Sadu / CRIS UNS).
-
-    Koristi se kada korisnik pita o istraživačkim radovima, temama, autorima ili 
-    naučnim dostignućima na Univerzitetu.
-
+    Search publications, research papers, and journals from TeslaRIS CRIS/RIMS platform.
+    
     Args:
-        query: Upit na prirodnom jeziku (npr. 'pšenica i brašno', 'veštačka inteligencija u medicini')
-        n_results: Broj relevantnih radova koje treba vratiti (podrazumevano 5)
-
-    Returns:
-        Tekstualni format pronađenih radova sa naslovom, izvorom i autorima.
+        query: Search query or topic in English or Serbian (e.g. 'machine learning', 'komunikacija').
+        top_k: Number of search results to return (default is 5).
+        entity_type: Filter by 'all', 'article', or 'journal'.
     """
-    # Za logovanje uvek koristimo sys.stderr umesto print()
-    sys.stderr.write(f"--> [MCP Server] Pozvan alat za upit: '{query}'\n")
-
-    results = vector_store.search(query=query, n_results=n_results)
-
+    filter_type = None if entity_type == "all" else entity_type
+    results = vsm.search(query=query, top_k=top_k, entity_type=filter_type)
+    
     if not results:
-        return "Nije pronađen nijedan relevantan rad za navedeni upit."
-
+        return "No matching records found in TeslaRIS database."
+        
     formatted_output = []
-    for idx, item in enumerate(results, 1):
-        title = item.get("title", "Naslov nepoznat")
-        source = item.get("source", "Izvor nepoznat")
-        authors = item.get("authors", [])
-
-        if isinstance(authors, list):
-            authors_str = ", ".join(authors)
-        else:
-            authors_str = str(authors)
-
-        formatted_output.append(
-            f"Rad #{idx}:\n"
-            f"- Naslov: {title}\n"
-            f"- Izvor: {source}\n"
-            f"- Autori: {authors_str}\n"
+    for item in results:
+        authors_str = ", ".join(item.get("authors", [])) if item.get("authors") else "Unknown author"
+        entry = (
+            f"Type: {item.get('entity_type', 'article').upper()}\n"
+            f"Title: {item.get('title')}\n"
+            f"Authors: {authors_str}\n"
+            f"Source: {item.get('source')}\n"
+            f"Abstract: {item.get('abstract')}\n"
+            f"----------------------------------------"
         )
-
-    return "\n".join(formatted_output)
-
+        formatted_output.append(entry)
+        
+    return "\n\n".join(formatted_output)
 
 if __name__ == "__main__":
-    # Pokrećemo server preko STDIO transporta bez print poruka na STDOUT
     mcp.run(transport="stdio")

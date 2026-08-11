@@ -1,77 +1,88 @@
 import os
 import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "chroma_db")
-
-# Višejezični model koji fantastično razume i srpski i engleski
-multilingual_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name="paraphrase-multilingual-MiniLM-L12-v2"
-)
-
+from sentence_transformers import SentenceTransformer
+from typing import List, Dict, Any, Optional
 
 class VectorStoreManager:
-    def __init__(self, db_path=DB_PATH, collection_name="teslaris_publications"):
-        self.client = chromadb.PersistentClient(
-            path=db_path,
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=False
-            )
-        )
-        # Inicijalizacija kolekcije sa višejezičnim embedding modelom
+    """
+    Manages vector embeddings and ChromaDB operations with entity type filtering support.
+    """
+    def __init__(self, collection_name: str = "teslaris_publications", db_path: str = "./chroma_db"):
+        self.db_path = db_path
+        self.collection_name = collection_name
+        
+        self.client = chromadb.PersistentClient(path=self.db_path)
+        self.model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        
         self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=multilingual_ef
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"}
         )
 
-    def add_records(self, records):
-        """Dodaje listu radova u kolekciju"""
+    def add_records(self, records: List[Dict[str, Any]]):
+        if not records:
+            return
+
         documents = []
         metadatas = []
         ids = []
 
-        for idx, rec in enumerate(records):
-            doc_text = f"Naslov: {rec.get('title', '')}. Sažetak: {rec.get('abstract', '')}"
-            documents.append(doc_text)
+        for i, rec in enumerate(records):
+            text_representation = f"Title: {rec['title']}\nAbstract: {rec['abstract']}\nAuthors: {', '.join(rec['authors'])}"
+            documents.append(text_representation)
             
-            authors_str = ", ".join(rec.get("authors", [])) if isinstance(rec.get("authors"), list) else str(rec.get("authors", ""))
             metadatas.append({
-                "title": rec.get("title", "Nepoznat naslov"),
-                "source": rec.get("source", "Nepoznat izvor"),
-                "authors": authors_str
+                "source_id": str(rec.get("id", "N/A")),
+                "title": str(rec["title"]),
+                "abstract": str(rec["abstract"]),
+                "authors": ", ".join(rec["authors"]),
+                "source": str(rec["source"]),
+                "entity_type": str(rec.get("entity_type", "article"))
             })
             
-            ids.append(f"rec_{idx}_{rec.get('id', 'no_id')}")
+            doc_id = f"{rec['source']}_{rec.get('id', i)}_{i}".replace(" ", "_")
+            ids.append(doc_id)
 
-        if documents:
-            self.collection.add(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
-            print(f"--> Uspešno dodato {len(documents)} radova u kolekciju '{self.collection.name}'.")
+        embeddings = self.model.encode(documents).tolist()
 
-    def search(self, query: str, n_results: int = 5):
-        print(f"--> [VectorStore] Pretražujem bazu za upit: '{query}'")
+        self.collection.add(
+            documents=documents,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            ids=ids
+        )
+        print(f"--> Uspešno dodato {len(records)} zapisa u kolekciju '{self.collection_name}'.")
+
+    def search(self, query: str, top_k: int = 5, entity_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        query_embedding = self.model.encode([query]).tolist()
         
+        where_filter = None
+        if entity_type and entity_type in ["article", "journal"]:
+            where_filter = {"entity_type": entity_type}
+
         results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results
+            query_embeddings=query_embedding,
+            n_results=top_k,
+            where=where_filter
         )
 
         formatted_results = []
-        if results and results.get("documents") and results["documents"][0]:
-            documents = results["documents"][0]
-            metadatas = results["metadatas"][0] if results.get("metadatas") else [{}] * len(documents)
-
-            for doc, meta in zip(documents, metadatas):
+        if results and results.get("metadatas"):
+            metas = results["metadatas"][0]
+            distances = results["distances"][0] if results.get("distances") else [0]*len(metas)
+            
+            for meta, dist in zip(metas, distances):
                 formatted_results.append({
-                    "title": meta.get("title", doc[:60]),
-                    "source": meta.get("source", "Nepoznat izvor"),
-                    "authors": meta.get("authors", "Nepoznati autori")
+                    "id": meta.get("source_id"),
+                    "title": meta.get("title"),
+                    "abstract": meta.get("abstract"),
+                    "authors": meta.get("authors").split(", ") if meta.get("authors") else [],
+                    "source": meta.get("source"),
+                    "entity_type": meta.get("entity_type", "article"),
+                    "similarity_score": round(1 - dist, 4)
                 })
 
         return formatted_results
+
+    def get_count(self) -> int:
+        return self.collection.count()

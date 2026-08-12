@@ -10,7 +10,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,21 +40,20 @@ def get_stats():
 def search(
     query: str = Query(..., description="Search query string"),
     top_k: int = Query(5, ge=1, le=20, description="Number of results to return"),
-    entity_type: Optional[str] = Query("all", description="Filter by entity type: 'all', 'article', or 'journal'")
+    source: Optional[str] = Query("all", description="Filter by source: 'all', 'xml', or 'json'")
 ):
     """
-    Semantic search endpoint supporting entity filtering.
+    Semantic search endpoint with simplified source filtering.
     """
-    filter_type = None if entity_type == "all" else entity_type
-    results = vsm.search(query=query, top_k=top_k, entity_type=filter_type)
+    filter_source = None if source == "all" else source
+    results = vsm.search(query=query, top_k=top_k, source=filter_source)
     
     return {
         "query": query,
-        "entity_type_filter": entity_type,
+        "source_filter": source,
         "total_results": len(results),
         "results": results
     }
 
-# Ova sekcija drži server pokrenutim!
 if __name__ == "__main__":
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)

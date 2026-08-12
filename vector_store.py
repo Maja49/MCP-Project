@@ -4,9 +4,6 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Optional
 
 class VectorStoreManager:
-    """
-    Manages vector embeddings and ChromaDB operations with entity type filtering support.
-    """
     def __init__(self, collection_name: str = "teslaris_publications", db_path: str = "./chroma_db"):
         self.db_path = db_path
         self.collection_name = collection_name
@@ -53,12 +50,20 @@ class VectorStoreManager:
         )
         print(f"--> Uspešno dodato {len(records)} zapisa u kolekciju '{self.collection_name}'.")
 
-    def search(self, query: str, top_k: int = 5, entity_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def search(
+        self, 
+        query: str, 
+        top_k: int = 5, 
+        source: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         query_embedding = self.model.encode([query]).tolist()
         
         where_filter = None
-        if entity_type and entity_type in ["article", "journal"]:
-            where_filter = {"entity_type": entity_type}
+        if source and source != "all":
+            if source.lower() == "xml":
+                where_filter = {"source": "OpenAIRE (XML)"}
+            elif source.lower() == "json":
+                where_filter = {"source": "SKG-IF (JSON)"}
 
         results = self.collection.query(
             query_embeddings=query_embedding,

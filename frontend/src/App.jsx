@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, Database, Cpu, CheckCircle2, Filter } from 'lucide-react';
+import { Search, ExternalLink, Database, Cpu, CheckCircle2, Layers } from 'lucide-react';
 
 function App() {
   const [query, setQuery] = useState('');
   const [topK, setTopK] = useState(5);
-  const [entityType, setEntityType] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all'); // Filter za izvor (all / xml / json)
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ total_records: 0, embedding_model: '', mcp_status: '' });
@@ -29,8 +29,9 @@ function App() {
 
     setLoading(true);
     try {
+      // Šaljemo upit i opcioni izvor (xml/json/all)
       const res = await fetch(
-        `http://localhost:8000/api/search?query=${encodeURIComponent(query)}&top_k=${topK}&entity_type=${entityType}`
+        `http://localhost:8000/api/search?query=${encodeURIComponent(query)}&top_k=${topK}&source=${sourceFilter}`
       );
       const data = await res.json();
       setResults(data.results || []);
@@ -41,9 +42,24 @@ function App() {
     }
   };
 
+  // Dinamičko usmeravanje na TeslaRIS
   const getTargetUrl = (item) => {
-    // Pretraga po tačnom naslovu na TeslaRIS portalu garantuje otvaranje prave stranice bez 404 greške
-    return `https://cris.uns.ac.rs/sr/search?q=${encodeURIComponent('"' + item.title + '"')}`;
+    if (!item) return "https://cris.uns.ac.rs";
+
+    const numericId = item.id ? String(item.id).replace(/[^0-9]/g, "") : "";
+
+    // 1. Ako je ČASOPIS -> ide na pretragu po nazivu časopisa
+    if (item.entity_type === "journal") {
+      const encodedTitle = encodeURIComponent(item.title || "");
+      return `https://cris.uns.ac.rs/sr/advanced-search?searchQuery=${encodedTitle}&tab=publications&search=simple`;
+    }
+
+    // 2. Ako je RAD/ČLANAK -> ide direktno na publikaciju preko ID-ja
+    if (numericId) {
+      return `https://cris.uns.ac.rs/sr/scientific-results/journal-publication/${numericId}`;
+    }
+
+    return "https://cris.uns.ac.rs";
   };
 
   return (
@@ -101,7 +117,7 @@ function App() {
           </div>
         </div>
 
-        {/* Search Box & Controls */}
+        {/* Search Box */}
         <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl shadow-xl">
           <form onSubmit={handleSearch} className="space-y-4">
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -109,29 +125,28 @@ function App() {
             </label>
             
             <div className="flex flex-col md:flex-row gap-3">
-              {/* Input text */}
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-500" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. machine learning, komunikacija, artificial intelligence..."
+                  placeholder="Unesite pojam za pretragu (npr. komunikacija, elektrodem, AI...)"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
                 />
               </div>
 
-              {/* Filter Dropdown */}
+              {/* Filter po izvoru */}
               <div className="flex items-center space-x-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-                <Filter className="w-4 h-4 text-slate-400" />
+                <Layers className="w-4 h-4 text-slate-400" />
                 <select
-                  value={entityType}
-                  onChange={(e) => setEntityType(e.target.value)}
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
                   className="bg-transparent text-xs text-slate-200 focus:outline-none cursor-pointer"
                 >
-                  <option value="all" className="bg-slate-900">All Entities</option>
-                  <option value="article" className="bg-slate-900">Articles Only</option>
-                  <option value="journal" className="bg-slate-900">Journals Only</option>
+                  <option value="all" className="bg-slate-900">All Sources</option>
+                  <option value="xml" className="bg-slate-900">OpenAIRE (XML)</option>
+                  <option value="json" className="bg-slate-900">SKG-IF (JSON)</option>
                 </select>
               </div>
 
@@ -146,11 +161,10 @@ function App() {
                 <option value={15}>Top 15</option>
               </select>
 
-              {/* Search Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-medium px-6 py-3 rounded-xl transition-all text-sm flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20"
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-medium px-6 py-3 rounded-xl transition-all text-sm flex items-center justify-center shadow-lg shadow-indigo-600/20"
               >
                 {loading ? 'Searching...' : 'Search'}
               </button>
@@ -158,15 +172,10 @@ function App() {
           </form>
         </div>
 
-        {/* Results Section */}
+        {/* Results */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
             <span>Search Results ({results.length})</span>
-            {entityType !== 'all' && (
-              <span className="text-xs text-indigo-400 font-normal border border-indigo-500/30 px-2 py-0.5 rounded-md bg-indigo-500/10">
-                Filtered: {entityType === 'article' ? 'Articles' : 'Journals'}
-              </span>
-            )}
           </h2>
 
           <div className="space-y-3">
@@ -177,9 +186,11 @@ function App() {
               >
                 <div className="space-y-2 max-w-4xl">
                   <div className="flex items-center space-x-2">
+                    {/* Izvor bedž */}
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-indigo-400 border border-slate-700">
                       {item.source}
                     </span>
+                    {/* Tip bedž (Article ili Journal) */}
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${
                       item.entity_type === 'journal' 
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
@@ -203,17 +214,18 @@ function App() {
                   </p>
 
                   <div className="text-xs text-slate-500">
-                    <span className="font-medium text-slate-400">Authors: </span>
-                    {item.authors && item.authors.length > 0 ? item.authors.join(', ') : 'Unknown author'}
+                    <span className="font-medium text-slate-400">Authors / Info: </span>
+                    {Array.isArray(item.authors) ? item.authors.join(', ') : (item.authors || 'Unknown')}
                   </div>
                 </div>
 
+                {/* Preusmeravanje na TeslaRIS */}
                 <a
                   href={getTargetUrl(item)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-all"
-                  title="Open on TeslaRIS"
+                  title={item.entity_type === 'journal' ? "Search journal on TeslaRIS" : "Open article on TeslaRIS"}
                 >
                   <ExternalLink className="w-5 h-5" />
                 </a>
@@ -222,7 +234,7 @@ function App() {
 
             {!loading && results.length === 0 && (
               <div className="text-center py-12 bg-slate-900/20 border border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
-                No matching results found. Try searching with a different term or filter.
+                No results found. Try a different search term.
               </div>
             )}
           </div>

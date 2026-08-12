@@ -1,18 +1,19 @@
 import requests
+import re
 from xml.etree import ElementTree as ET
 from typing import List, Dict, Any
 from .base import BaseConnector
 
 class OpenAIREConnector(BaseConnector):
     """
-    Connector for OpenAIRE CERIF (XML) API of the TeslaRIS platform.
+    Konektor za OpenAIRE CERIF (XML) API sa TeslaRIS platforme.
     """
     def fetch_records(self, limit: int = 500) -> List[Dict[str, Any]]:
         records = []
         current_url = self.endpoint_url
         base_url = self.endpoint_url.split('?')[0]
 
-        print(f"--> [OpenAIRE] Fetching data from: {self.endpoint_url}")
+        print(f"--> [OpenAIRE XML] Preuzimanje podataka sa: {self.endpoint_url}")
 
         while len(records) < limit and current_url:
             response = requests.get(current_url)
@@ -41,12 +42,6 @@ class OpenAIREConnector(BaseConnector):
         records = []
         xml_records = root.findall('.//{*}record')
 
-        # Proširene ključne reči koje ukazuju na časopis/serijsku publikaciju
-        journal_keywords = [
-            "journal", "transactions", "communications", 
-            "review", "bulletin", "proceedings", "annals", "letters"
-        ]
-
         for record in xml_records:
             header = record.find('./{*}header')
             if header is not None and header.attrib.get('status') == 'deleted':
@@ -56,18 +51,20 @@ class OpenAIREConnector(BaseConnector):
             if metadata is None:
                 continue
 
+            # 1. Izvlačenje čisto brojčanog ID-ja
             raw_id = ""
             if header is not None:
                 header_id_elem = header.find('./{*}identifier')
                 if header_id_elem is not None and header_id_elem.text:
                     raw_id = header_id_elem.text.strip()
 
-            clean_id = raw_id.split(":")[-1] if ":" in raw_id else raw_id
-            clean_id = clean_id.split("/")[-1] if "/" in clean_id else clean_id
+            numbers = re.findall(r'\d+', raw_id)
+            clean_id = numbers[0] if numbers else raw_id
 
-            pub_elem = metadata.find('.//{*}cfResPubl') or metadata
-            titles = pub_elem.findall('./{*}cfTitle') or pub_elem.findall('.//{*}Title') or pub_elem.findall('.//{*}title')
+            pub_elem = metadata.find('.//{*}cfResPubl') or metadata.find('.//{*}Publication') or metadata
             
+            # 2. Naslov
+            titles = pub_elem.findall('./{*}cfTitle') or pub_elem.findall('.//{*}Title') or pub_elem.findall('.//{*}title')
             title_text = ""
             for t in titles:
                 if t.text and len(t.text.strip()) > 0:
@@ -77,29 +74,13 @@ class OpenAIREConnector(BaseConnector):
             if not title_text:
                 continue
 
-            # Određivanje da li je časopis ili konkretan rad
-            lower_title = title_text.lower()
+            # 3. Sažetak i Autori
             abstracts = pub_elem.findall('./{*}cfAbstr') or pub_elem.findall('.//{*}Abstract') or pub_elem.findall('.//{*}description')
             
-            # Poboljšana heuristika za klasifikaciju
-            is_journal = any(kw in lower_title for kw in journal_keywords) and not abstracts and len(title_text.split()) < 10
-
-            if is_journal:
-                entity_type = "journal"
-                abstract_text = "Journal Profile / Periodical Publication"
-            else:
-                entity_type = "article"
-                abstract_text = "Abstract unavailable"
-                for a in abstracts:
-                    if a.text and len(a.text.strip()) > 0:
-                        abstract_text = a.text.strip()
-                        break
-
-            # Autori
-            author_names = []
             first_names = [e.text.strip() for e in (pub_elem.findall('.//{*}Firstname') + pub_elem.findall('.//{*}cfFirstNames')) if e.text and e.text.strip()]
             family_names = [e.text.strip() for e in (pub_elem.findall('.//{*}Familyname') + pub_elem.findall('.//{*}cfFamilyNames')) if e.text and e.text.strip()]
 
+            author_names = []
             if first_names and family_names:
                 for fn, ln in zip(first_names, family_names):
                     author_names.append(f"{fn} {ln}")
@@ -110,12 +91,33 @@ class OpenAIREConnector(BaseConnector):
                     if c.text and len(c.text.strip()) > 0:
                         author_names.append(c.text.strip())
 
+            # 4. Detekcija tipa entiteta (Journal vs Article)
+            coar_type_elem = pub_elem.find('.//{*}Type')
+            coar_type = coar_type_elem.text.strip() if coar_type_elem is not None and coar_type_elem.text else ""
+
+            # Časopis je samo ako je striktno klasifikovan kao journal I nema navedene autore/sažetak rada
+            is_journal = ("c_0640" in coar_type or "journal" in coar_type.lower()) and not author_names and not abstracts
+
+            if is_journal:
+                entity_type = "journal"
+                abstract_text = "Profil naučnog časopisa / Periodična publikacija"
+                issn_elem = pub_elem.find('.//{*}ISSN')
+                if issn_elem is not None and issn_elem.text:
+                    author_names = [f"ISSN: {issn_elem.text.strip()}"]
+            else:
+                entity_type = "article"
+                abstract_text = "Sažetak nije dostupan"
+                for a in abstracts:
+                    if a.text and len(a.text.strip()) > 0:
+                        abstract_text = a.text.strip()
+                        break
+
             records.append({
                 "id": clean_id if clean_id else "N/A",
                 "title": title_text,
                 "abstract": abstract_text,
-                "authors": author_names if author_names else ["Unknown author"],
-                "source": "TeslaRIS OpenAIRE (XML)",
+                "authors": author_names if author_names else ["Nepoznati autor"],
+                "source": "OpenAIRE (XML)",
                 "entity_type": entity_type
             })
 

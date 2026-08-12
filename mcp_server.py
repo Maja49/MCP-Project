@@ -1,7 +1,7 @@
 import os
 import sys
 
-# 1. Postavljanje radnog direktorijuma na koren projekta (spasava od FileNotFoundError)
+# Postavljanje radnog direktorijuma na koren projekta
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -11,22 +11,22 @@ from vector_store import VectorStoreManager
 # Inicijalizacija FastMCP servera
 mcp = FastMCP("TeslaRIS MCP Server")
 
-# Eksplicitna apsolutna putanja do ChromaDB
+# Apsolutna putanja do ChromaDB
 db_path = os.path.join(PROJECT_ROOT, "chroma_db")
 vsm = VectorStoreManager(db_path=db_path)
 
 @mcp.tool()
-def search_tesla_ris_publications(query: str, top_k: int = 5, entity_type: str = "all") -> str:
+def search_tesla_ris_publications(query: str, top_k: int = 5, source: str = "all") -> str:
     """
-    Search publications, research papers, and journals from TeslaRIS CRIS/RIMS platform.
+    Search publications, research papers, and journals from TeslaRIS CRIS/RIMS platform using semantic RAG.
     
     Args:
-        query: Search query or topic in English or Serbian (e.g. 'machine learning', 'komunikacija').
-        top_k: Number of search results to return (default is 5).
-        entity_type: Filter by 'all', 'article', or 'journal'.
+        query: Search query or topic in English or Serbian (e.g. 'veštačka inteligencija', 'machine learning').
+        top_k: Number of search results to return (default is 5, max 20).
+        source: Filter by metadata source format: 'all', 'xml' (OpenAIRE CERIF), or 'json' (SKG-IF).
     """
-    filter_type = None if entity_type == "all" else entity_type
-    results = vsm.search(query=query, top_k=top_k, entity_type=filter_type)
+    filter_source = None if source == "all" else source
+    results = vsm.search(query=query, top_k=top_k, source=filter_source)
     
     if not results:
         return "No matching records found in TeslaRIS database."

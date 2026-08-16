@@ -10,3 +10,6 @@ chroma_db/
 
 # VS Code podešavanja
 .vscode/
+
+node_modules/
+**/node_modules/

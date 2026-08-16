@@ -29,7 +29,7 @@ function App() {
 
     setLoading(true);
     try {
-      // Šaljemo upit i opcioni izvor (xml/json/all)
+      // (xml/json/all)
       const res = await fetch(
         `http://localhost:8000/api/search?query=${encodeURIComponent(query)}&top_k=${topK}&source=${sourceFilter}`
       );
@@ -48,13 +48,13 @@ function App() {
 
     const numericId = item.id ? String(item.id).replace(/[^0-9]/g, "") : "";
 
-    // 1. Ako je ČASOPIS -> ide na pretragu po nazivu časopisa
+    // 1. Ako je casopis -> ide na pretragu po nazivu časopisa
     if (item.entity_type === "journal") {
       const encodedTitle = encodeURIComponent(item.title || "");
       return `https://cris.uns.ac.rs/sr/advanced-search?searchQuery=${encodedTitle}&tab=publications&search=simple`;
     }
 
-    // 2. Ako je RAD/ČLANAK -> ide direktno na publikaciju preko ID-ja
+    // 2. Ako je rad/clanak -> ide direktno na publikaciju preko ID-ja
     if (numericId) {
       return `https://cris.uns.ac.rs/sr/scientific-results/journal-publication/${numericId}`;
     }
@@ -186,11 +186,11 @@ function App() {
               >
                 <div className="space-y-2 max-w-4xl">
                   <div className="flex items-center space-x-2">
-                    {/* Izvor bedž */}
+                    {/*  */}
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-indigo-400 border border-slate-700">
                       {item.source}
                     </span>
-                    {/* Tip bedž (Article ili Journal) */}
+                    {/*  (Article ili Journal) */}
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${
                       item.entity_type === 'journal' 
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 

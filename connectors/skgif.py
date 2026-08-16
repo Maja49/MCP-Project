@@ -4,7 +4,7 @@ from .base import BaseConnector
 
 class SKGIFConnector(BaseConnector):
     """
-    Connector for SKG-IF (JSON-LD) API of the TeslaRIS platform with pagination support.
+    
     """
     def fetch_records(self, limit: int = 500) -> List[Dict[str, Any]]:
         print(f"--> [SKG-IF JSON] Fetching data from API (target: {limit} records)...")
@@ -40,11 +40,11 @@ class SKGIFConnector(BaseConnector):
                 contributions = item.get("contributions", [])
                 authors = [contrib.get("by", "Unknown ID") for contrib in contributions if contrib.get("role") == "author"]
 
-                # 3. Čišćenje ID-ja (uzima numerički/krajnji deo ID-ja)
+                # 3. 
                 raw_id = item.get("@id", "")
                 clean_id = raw_id.split("/")[-1] if "/" in raw_id else item.get("local_identifier", "N/A")
 
-                # 4. Detekcija tipa entiteta (Journal vs Article)
+                # 4. Journal vs Article
                 raw_type = str(item.get("@type") or item.get("type") or "").lower()
                 title_lower = title_text.lower()
 

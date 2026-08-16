@@ -6,7 +6,7 @@ from .base import BaseConnector
 
 class OpenAIREConnector(BaseConnector):
     """
-    Konektor za OpenAIRE CERIF (XML) API sa TeslaRIS platforme.
+    Konektor za OpenAIRE CERIF (XML) API sa TeslaRIS platforme
     """
     def fetch_records(self, limit: int = 500) -> List[Dict[str, Any]]:
         records = []
@@ -51,7 +51,7 @@ class OpenAIREConnector(BaseConnector):
             if metadata is None:
                 continue
 
-            # 1. Izvlačenje čisto brojčanog ID-ja
+            
             raw_id = ""
             if header is not None:
                 header_id_elem = header.find('./{*}identifier')
@@ -74,7 +74,7 @@ class OpenAIREConnector(BaseConnector):
             if not title_text:
                 continue
 
-            # 3. Sažetak i Autori
+            # 3. Sazetak i autori
             abstracts = pub_elem.findall('./{*}cfAbstr') or pub_elem.findall('.//{*}Abstract') or pub_elem.findall('.//{*}description')
             
             first_names = [e.text.strip() for e in (pub_elem.findall('.//{*}Firstname') + pub_elem.findall('.//{*}cfFirstNames')) if e.text and e.text.strip()]
@@ -91,11 +91,11 @@ class OpenAIREConnector(BaseConnector):
                     if c.text and len(c.text.strip()) > 0:
                         author_names.append(c.text.strip())
 
-            # 4. Detekcija tipa entiteta (Journal vs Article)
+            # 4.  (Journal vs Article)
             coar_type_elem = pub_elem.find('.//{*}Type')
             coar_type = coar_type_elem.text.strip() if coar_type_elem is not None and coar_type_elem.text else ""
 
-            # Časopis je samo ako je striktno klasifikovan kao journal I nema navedene autore/sažetak rada
+            
             is_journal = ("c_0640" in coar_type or "journal" in coar_type.lower()) and not author_names and not abstracts
 
             if is_journal:

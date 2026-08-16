@@ -11,7 +11,7 @@ from vector_store import VectorStoreManager
 # Inicijalizacija FastMCP servera
 mcp = FastMCP("TeslaRIS MCP Server")
 
-# Apsolutna putanja do ChromaDB
+#  putanja do ChromaDB
 db_path = os.path.join(PROJECT_ROOT, "chroma_db")
 vsm = VectorStoreManager(db_path=db_path)
 

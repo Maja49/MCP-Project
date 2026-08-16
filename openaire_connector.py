@@ -28,7 +28,7 @@ class OpenAIREConnector:
             root = ET.fromstring(response.content)
             page_records = self._parse_xml_records(root)
             
-            # Dodajemo samo onoliko radova koliko nedostaje do limita
+            
             needed = limit - len(records)
             records.extend(page_records[:needed])
             
@@ -37,14 +37,14 @@ class OpenAIREConnector:
             if len(records) >= limit:
                 break
 
-            # Tražimo resumptionToken za učitavanje sledeće stranice
+            
             token_elem = root.find('.//{*}resumptionToken')
             if token_elem is not None and token_elem.text and token_elem.text.strip():
                 token = token_elem.text.strip()
                 # OAI-PMH standard zahteva samo verb=ListRecords i resumptionToken
                 current_url = f"{base_url}?verb=ListRecords&resumptionToken={token}"
             else:
-                # Nema više stranica za preuzimanje
+                
                 current_url = None
 
         return records
@@ -58,7 +58,7 @@ class OpenAIREConnector:
             if metadata is None:
                 continue
 
-            # Tražimo naslove (CERIF koristi cfTitle ili Title)
+            
             titles = record.findall('.//{*}Title') or record.findall('.//{*}cfTitle')
             abstracts = record.findall('.//{*}Abstract') or record.findall('.//{*}cfAbstr')
             
@@ -76,7 +76,6 @@ class OpenAIREConnector:
                         abstract_text = a.text.strip()
                         break
 
-            # Sakupljanje autora (Firstname, Familyname ili Person / cfPers)
             first_names = [e.text.strip() for e in record.findall('.//{*}Firstname') if e.text]
             family_names = [e.text.strip() for e in record.findall('.//{*}Familyname') if e.text]
             

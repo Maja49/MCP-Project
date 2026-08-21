@@ -1,0 +1,72 @@
+[
+  {
+    "query_id": 1,
+    "query_text": "ekohemijsko obrazovanje radnika u hemijskoj industriji",
+    "language": "sr",
+    "category": "sr_to_sr",
+    "relevant_ids": ["(CRISUNS)8588", "(CRISUNS)8602"]
+  },
+  {
+    "query_id": 2,
+    "query_text": "free sulphydryl groups wheat flour maturation",
+    "language": "en",
+    "category": "en_to_en",
+    "relevant_ids": ["(CRISUNS)8592", "(CRISUNS)8593"]
+  },
+  {
+    "query_id": 3,
+    "query_text": "vrednovanje znanja učenika u nastavi poznavanja prirode",
+    "language": "sr",
+    "category": "sr_to_sr",
+    "relevant_ids": ["(CRISUNS)8594"]
+  },
+  {
+    "query_id": 4,
+    "query_text": "gluten quality and amino acids in wheat",
+    "language": "en",
+    "category": "en_to_en",
+    "relevant_ids": ["(CRISUNS)8595", "(CRISUNS)8593"]
+  },
+  {
+    "query_id": 5,
+    "query_text": "kvalitet pšeničnog brašna i gluten",
+    "language": "sr",
+    "category": "cross_lingual",
+    "relevant_ids": ["(CRISUNS)8592", "(CRISUNS)8595", "(CRISUNS)8596"]
+  },
+  {
+    "query_id": 6,
+    "query_text": "inactivation of Salmonella Typhimurium and Listeria in sausages",
+    "language": "en",
+    "category": "en_to_en",
+    "relevant_ids": ["(CRISUNS)8597"]
+  },
+  {
+    "query_id": 7,
+    "query_text": "inaktivacija bakterija i pasterizacija u suvovratim kobasicama",
+    "language": "sr",
+    "category": "cross_lingual",
+    "relevant_ids": ["(CRISUNS)8597"]
+  },
+  {
+    "query_id": 8,
+    "query_text": "Ornithogalum taxa anatomical and phytochemical profile",
+    "language": "en",
+    "category": "en_to_en",
+    "relevant_ids": ["(CRISUNS)8601", "(CRISUNS)8603"]
+  },
+  {
+    "query_id": 9,
+    "query_text": "anatomija i fithemijski profil roda Ornithogalum u Srbiji",
+    "language": "sr",
+    "category": "cross_lingual",
+    "relevant_ids": ["(CRISUNS)8601", "(CRISUNS)8603"]
+  },
+  {
+    "query_id": 10,
+    "query_text": "environmental education for workers in chemical industry",
+    "language": "en",
+    "category": "cross_lingual",
+    "relevant_ids": ["(CRISUNS)8588", "(CRISUNS)8602"]
+  }
+]
